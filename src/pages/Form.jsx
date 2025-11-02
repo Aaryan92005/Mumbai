@@ -14,6 +14,8 @@ const Form = () => {
     symptoms: ''
   })
   const [success, setSuccess] = useState('')
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
   const [selectedDoctor, setSelectedDoctor] = useState(null)
 
   const handleChange = (e) => {
@@ -37,39 +39,49 @@ const Form = () => {
     }
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
+    setLoading(true)
+    setError('')
+    setSuccess('')
     
-    // Save appointment data to localStorage
-    const appointments = JSON.parse(localStorage.getItem('appointments')) || []
-    const newAppointment = {
-      ...formData,
-      id: Date.now(),
-      status: 'pending',
-      bookedAt: new Date().toISOString(),
-      doctorDetails: selectedDoctor
+    try {
+      const response = await fetch('http://localhost:5000/api/appointments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData)
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        setSuccess('Appointment booked successfully! You will receive a confirmation email shortly.')
+        
+        // Reset form
+        setFormData({
+          patientName: '',
+          email: '',
+          phone: '',
+          specialization: '',
+          doctor: '',
+          appointmentDate: '',
+          timeSlot: '',
+          symptoms: ''
+        })
+        setSelectedDoctor(null)
+        
+        // Clear success message after 5 seconds
+        setTimeout(() => setSuccess(''), 5000)
+      } else {
+        setError(data.message || 'Failed to book appointment')
+      }
+    } catch (err) {
+      setError('Network error. Please make sure the server is running.')
+    } finally {
+      setLoading(false)
     }
-    
-    appointments.push(newAppointment)
-    localStorage.setItem('appointments', JSON.stringify(appointments))
-    
-    setSuccess('Appointment booked successfully! You will receive a confirmation email shortly.')
-    
-    // Reset form
-    setFormData({
-      patientName: '',
-      email: '',
-      phone: '',
-      specialization: '',
-      doctor: '',
-      appointmentDate: '',
-      timeSlot: '',
-      symptoms: ''
-    })
-    setSelectedDoctor(null)
-    
-    // Clear success message after 5 seconds
-    setTimeout(() => setSuccess(''), 5000)
   }
 
   const getAvailableDoctors = () => {
@@ -100,6 +112,12 @@ const Form = () => {
           {success && (
             <div className="mb-6 p-4 bg-green-100 border border-green-400 text-green-700 rounded">
               {success}
+            </div>
+          )}
+
+          {error && (
+            <div className="mb-6 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
+              {error}
             </div>
           )}
 
@@ -300,9 +318,10 @@ const Form = () => {
               </button>
               <button
                 type="submit"
-                className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors duration-300"
+                disabled={loading}
+                className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors duration-300"
               >
-                Book Appointment
+                {loading ? 'Booking...' : 'Book Appointment'}
               </button>
             </div>
           </form>
